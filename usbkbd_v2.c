@@ -1,3 +1,15 @@
+/**
+ * @Author: Izhar Shaikh <izhar>
+ * @Date:   2017-04-19T19:00:03-04:00
+ * @Email:  izharits@gmail.com
+ * @Filename: usbkbd_v2.c
+ * @Last modified by:   izhar
+ * @Last modified time: 2017-04-19T19:15:41-04:00
+ * @License: MIT
+ */
+
+
+
 /*
  *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
@@ -37,8 +49,8 @@
  * Version Information
  */
 #define DRIVER_VERSION ""
-#define DRIVER_AUTHOR "Vojtech Pavlik <vojtech@ucw.cz>"
-#define DRIVER_DESC "USB HID Boot Protocol keyboard driver"
+#define DRIVER_AUTHOR "Izhar Shaikh <izharits@gmail.com>"
+#define DRIVER_DESC "USB HID Boot Protocol keyboard driver (Modified)"
 
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
@@ -126,6 +138,9 @@ static void usb_kbd_irq(struct urb *urb)
 		goto resubmit;
 	}
 
+	// TODO:: Remove
+	// printk(KERN_INFO "%s:: Received IRQ ...***\n", kbd->name);
+
 	for (i = 0; i < 8; i++)
 		input_report_key(kbd->dev, usb_kbd_keycode[i + 224], (kbd->new[0] >> i) & 1);
 
@@ -168,6 +183,9 @@ static int usb_kbd_event(struct input_dev *dev, unsigned int type,
 	unsigned long flags;
 	struct usb_kbd *kbd = input_get_drvdata(dev);
 
+	// TODO:: Remove
+	printk(KERN_INFO "%s:: Received kbd_event from input layer ...***\n", kbd->name);
+
 	if (type != EV_LED)
 		return -1;
 
@@ -187,6 +205,10 @@ static int usb_kbd_event(struct input_dev *dev, unsigned int type,
 	}
 
 	*(kbd->leds) = kbd->newleds;
+
+	// TODO:: Remove
+	printk(KERN_INFO "%s:: CAPSL: %d, NUML: %d ...***\n", kbd->name,
+							(kbd->newleds >> 1) & 0x1, (kbd->newleds) & 0x1);
 
 	kbd->led->dev = kbd->usbdev;
 	if (usb_submit_urb(kbd->led, GFP_ATOMIC))
@@ -235,6 +257,9 @@ static int usb_kbd_open(struct input_dev *dev)
 	if (usb_submit_urb(kbd->irq, GFP_KERNEL))
 		return -EIO;
 
+	// TODO:: Remove
+  printk(KERN_INFO "%s:: Successfully Opened!***\n", kbd->name);
+
 	return 0;
 }
 
@@ -282,6 +307,9 @@ static int usb_kbd_probe(struct usb_interface *iface,
 	int error = -ENOMEM;
 
 	interface = iface->cur_altsetting;
+
+	// TODO:: Remove
+	printk(KERN_INFO "%s:: Trying to probe...***\n", dev->manufacturer);
 
 	if (interface->desc.bNumEndpoints != 1)
 		return -ENODEV;
@@ -370,6 +398,9 @@ static int usb_kbd_probe(struct usb_interface *iface,
 	device_set_wakeup_enable(&dev->dev, 1);
 	return 0;
 
+	// TODO:: Remove
+  printk(KERN_INFO "%s:: Successfully Probed!***\n", kbd->name);
+
 fail2:
 	usb_kbd_free_mem(dev, kbd);
 fail1:
@@ -390,6 +421,9 @@ static void usb_kbd_disconnect(struct usb_interface *intf)
 		usb_kbd_free_mem(interface_to_usbdev(intf), kbd);
 		kfree(kbd);
 	}
+
+	// TODO:: Remove
+	printk(KERN_INFO "%s:: Successfully disconnected!***\n", kbd->name);
 }
 
 static struct usb_device_id usb_kbd_id_table [] = {
@@ -401,7 +435,7 @@ static struct usb_device_id usb_kbd_id_table [] = {
 MODULE_DEVICE_TABLE (usb, usb_kbd_id_table);
 
 static struct usb_driver usb_kbd_driver = {
-	.name =		"usbkbd",
+	.name =		"usbkbd_v2",
 	.probe =	usb_kbd_probe,
 	.disconnect =	usb_kbd_disconnect,
 	.id_table =	usb_kbd_id_table,
