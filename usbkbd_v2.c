@@ -4,8 +4,8 @@
  * @Email:  izharits@gmail.com
  * @Filename: usbkbd_v2.c
  * @Last modified by:   izhar
- * @Last modified time: 2017-04-19T19:15:41-04:00
- * @License: MIT
+ * @Last modified time: 2017-04-20T02:42:15-04:00
+ * @License: GPL v2
  */
 
 
@@ -51,6 +51,10 @@
 #define DRIVER_VERSION ""
 #define DRIVER_AUTHOR "Izhar Shaikh <izharits@gmail.com>"
 #define DRIVER_DESC "USB HID Boot Protocol keyboard driver (Modified)"
+
+// Keyboard Modes
+#define MODE1	1
+#define MODE2	2
 
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
@@ -107,8 +111,10 @@ struct usb_kbd {
 	unsigned char old[8];
 	struct urb *irq, *led;
 	unsigned char newleds;
+	unsigned char oldleds;
 	char name[128];
 	char phys[64];
+	int mode;
 
 	unsigned char *new;
 	struct usb_ctrlrequest *cr;
@@ -194,6 +200,30 @@ static int usb_kbd_event(struct input_dev *dev, unsigned int type,
 		       (!!test_bit(LED_SCROLLL, dev->led) << 2) | (!!test_bit(LED_CAPSL,   dev->led) << 1) |
 		       (!!test_bit(LED_NUML,    dev->led));
 
+	// Check if we're good to go for MODE2
+	// CAPSL should be off, NUML should be just pressed (was off before, now on),
+	// and we should be currently in MODE1
+	if( !((kbd->newleds >> 1) & 0x1)  /* CAPSL is off */
+      && !(kbd->oldleds & 0x1) && (kbd->newleds & 0x1)  /* NUML is just pressed (on)*/
+		  && kbd->mode == MODE1 ) {
+				kbd->mode = MODE2;
+				printk(KERN_INFO "%s:: Switched to MODE2 !!***\n", kbd->name);
+			}
+
+	// Or, Check if we're good to go for MODE1
+	// NUML should just be pressed (was on before, now off), and we should be in MODE1
+	if( (kbd->oldleds & 0x1) && !(kbd->newleds & 0x1)  /* NUML is just pressed (off) */
+	     && kbd->mode == MODE2 ) {
+				 kbd->mode = MODE1;
+				 printk(KERN_INFO "%s:: Switched to MODE1 !!***\n", kbd->name);
+			 }
+
+	// Flip the CAPSL when we're in MODE2
+	// This will invert the case of keys, until changed to MODE1 again
+	if(kbd->mode == MODE2){
+		kbd->newleds ^= (1 << 0x1);
+	}
+
 	if (kbd->led_urb_submitted){
 		spin_unlock_irqrestore(&kbd->leds_lock, flags);
 		return 0;
@@ -216,6 +246,9 @@ static int usb_kbd_event(struct input_dev *dev, unsigned int type,
 	else
 		kbd->led_urb_submitted = true;
 
+	// copy current led bitmap into old one
+	kbd->oldleds = kbd->newleds;
+
 	spin_unlock_irqrestore(&kbd->leds_lock, flags);
 
 	return 0;
@@ -225,6 +258,9 @@ static void usb_kbd_led(struct urb *urb)
 {
 	unsigned long flags;
 	struct usb_kbd *kbd = urb->context;
+
+	// TODO:: Remove
+	// printk(KERN_INFO "%s:: LED URB completion handler***\n", kbd->name);
 
 	if (urb->status)
 		hid_warn(urb->dev, "led urb status %d received\n",
@@ -389,6 +425,9 @@ static int usb_kbd_probe(struct usb_interface *iface,
 			     usb_kbd_led, kbd);
 	kbd->led->transfer_dma = kbd->leds_dma;
 	kbd->led->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
+
+	/* Set default mode to MODE1 */
+	kbd->mode = MODE1;
 
 	error = input_register_device(kbd->dev);
 	if (error)
